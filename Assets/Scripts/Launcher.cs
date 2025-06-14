@@ -121,7 +121,7 @@ public class Launcher : MonoBehaviourPunCallbacks
         if(!string.IsNullOrEmpty(roomNameInput.text))
         {
             RoomOptions options = new RoomOptions();
-            options.MaxPlayers = 8;
+            options.MaxPlayers = 2;
 
             PhotonNetwork.CreateRoom(roomNameInput.text, options);
 
