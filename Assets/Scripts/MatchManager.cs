@@ -435,7 +435,9 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
             PhotonNetwork.LeaveRoom();
         } else
         {
-            if(PhotonNetwork.IsMasterClient)
+
+            Debug.Log("EndCO else loop");
+            /*if(PhotonNetwork.IsMasterClient)
             {
                 if (!Launcher.instance.changeMapBetweenRounds)
                 {
@@ -452,7 +454,7 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
                         PhotonNetwork.LoadLevel(Launcher.instance.allMaps[newLevel]);
                     }
                 }
-            }
+            }*/
         }
     }
 
