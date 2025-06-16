@@ -109,6 +109,12 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
                     TimerSend();
                 }
             }
+            else
+            {
+                ShowLeaderboard();
+                EndGame();
+                Debug.Log("Time Over");
+            }
         }
     }
 
