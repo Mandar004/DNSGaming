@@ -789,6 +789,8 @@ MonoBehaviour:
   adsInPoint: {fileID: 2265550458196345942}
   footstepSlow: {fileID: 5706828992461828383}
   footstepFast: {fileID: 3543308917691524986}
+  moveJoystick: {fileID: 0}
+  lookJoystick: {fileID: 0}
 --- !u!143 &7338187917987308197
 CharacterController:
   m_ObjectHideFlags: 0

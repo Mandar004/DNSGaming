@@ -13,6 +13,12 @@ public class UIController : MonoBehaviour
     {
         instance = this;
     }
+    public FixedJoystick moveJoystick;
+    public FixedJoystick lookJoystick;
+
+    public Button jumpButton;
+    public Button fireButton;
+    public Button adsButton;
 
     public TMP_Text overheatedMessage;
     public Slider weaponTempSlider;
