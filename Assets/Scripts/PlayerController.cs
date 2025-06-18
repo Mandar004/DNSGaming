@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 using UnityEngine.UI;
+using TMPro;
+
 
 public class PlayerController : MonoBehaviourPunCallbacks
 {
@@ -12,6 +14,12 @@ public class PlayerController : MonoBehaviourPunCallbacks
     private Vector2 mouseInput;
 
     public bool invertLook;
+    public Team team;
+    public TMP_Text nameText; // Assign in prefab
+    public Color teamAColor = Color.red;
+    public Color teamBColor = Color.blue;
+
+
 
     public float moveSpeed = 5f, runSpeed = 8f;
     private float activeMoveSpeed;
@@ -69,10 +77,28 @@ public class PlayerController : MonoBehaviourPunCallbacks
 
         UIController.instance.adsButton.onClick.AddListener(() => isADS = !isADS);
     }
+    [PunRPC]
+    void RPC_ShowWinningTeam(string winnerName)
+    {
+        UIController.instance.endText.text = winnerName;
+        Debug.Log("Winner Text Set: " + winnerName);
+    }
 
     void Start()
     {
-          moveJoystick = UIController.instance.moveJoystick;
+
+        if (photonView.IsMine)
+        {
+            nameText.text = PhotonNetwork.NickName;
+        }
+        else
+        {
+            nameText.text = photonView.Owner.NickName;
+        }
+
+        nameText.color = (team == Team.TeamA) ? teamAColor : teamBColor;
+
+        moveJoystick = UIController.instance.moveJoystick;
     lookJoystick= UIController.instance.lookJoystick;
 
    
@@ -97,7 +123,10 @@ public class PlayerController : MonoBehaviourPunCallbacks
             gunHolder.localRotation = Quaternion.identity;
         }
 
-        playerModel.GetComponent<Renderer>().material = allSkins[photonView.Owner.ActorNumber % allSkins.Length];
+        //  playerModel.GetComponent<Renderer>().material = allSkins[photonView.Owner.ActorNumber % allSkins.Length];
+        // Optional: store red/blue materials in allSkins[0] = red, [1] = blue
+        playerModel.GetComponent<Renderer>().material = (team == Team.TeamA) ? allSkins[0] : allSkins[1];
+
     }
 
     void Update()
@@ -198,8 +227,13 @@ public class PlayerController : MonoBehaviourPunCallbacks
         {
             if (hit.collider.gameObject.tag == "Player")
             {
-                PhotonNetwork.Instantiate(playerHitImpact.name, hit.point, Quaternion.identity);
-                hit.collider.gameObject.GetPhotonView().RPC("DealDamage", RpcTarget.All, photonView.Owner.NickName, allGuns[selectedGun].shotDamage, PhotonNetwork.LocalPlayer.ActorNumber);
+                PlayerController hitPlayer = hit.collider.GetComponent<PlayerController>();
+
+                if (hitPlayer != null && hitPlayer.team != this.team)
+                {
+                    PhotonNetwork.Instantiate(playerHitImpact.name, hit.point, Quaternion.identity);
+                    hitPlayer.photonView.RPC("DealDamage", RpcTarget.All, photonView.Owner.NickName, allGuns[selectedGun].shotDamage, PhotonNetwork.LocalPlayer.ActorNumber);
+                }
             }
             else
             {
@@ -284,4 +318,11 @@ public class PlayerController : MonoBehaviourPunCallbacks
             SwitchGun();
         }
     }
+
+    [PunRPC]
+    public void SetTeam(int teamValue)
+    {
+        team = (Team)teamValue;
+    }
+
 }

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
@@ -9,10 +9,14 @@ using ExitGames.Client.Photon;
 public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
 {
     public static MatchManager instance;
+    public static Dictionary<Team, List<GameObject>> teams = new();
+    private bool alreadyGameEnd = false;
 
     private void Awake()
     {
         instance = this;
+        teams[Team.TeamA] = new List<GameObject>();
+        teams[Team.TeamB] = new List<GameObject>();
     }
 
     public enum EventCodes : byte
@@ -50,10 +54,11 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
     // Start is called before the first frame update
     void Start()
     {
-        if(!PhotonNetwork.IsConnected)
+        if (!PhotonNetwork.IsConnected)
         {
             SceneManager.LoadScene(0);
-        } else
+        }
+        else
         {
             NewPlayerSend(PhotonNetwork.NickName);
 
@@ -61,31 +66,44 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
             SetupTimer();
 
-            if(!PhotonNetwork.IsMasterClient)
+            if (!PhotonNetwork.IsMasterClient)
             {
                 UIController.instance.timerText.gameObject.SetActive(false);
             }
         }
     }
 
+    public void AssignTeam(GameObject player)
+    {
+        int totalPlayers = teams[Team.TeamA].Count + teams[Team.TeamB].Count;
+
+        Team assignedTeam = (totalPlayers % 2 == 0) ? Team.TeamA : Team.TeamB;
+
+        player.GetComponent<PlayerController>().team = assignedTeam;
+        teams[assignedTeam].Add(player);
+    }
+
     // Update is called once per frame
     void Update()
     {
-        if(Input.GetKeyDown(KeyCode.Tab) && state != GameState.Ending)
+        if (state == GameState.Ending || currentMatchTime <= 0f)
         {
-            if(UIController.instance.leaderboard.activeInHierarchy)
+
+            if (!alreadyGameEnd)
             {
-                UIController.instance.leaderboard.SetActive(false);
-            } else
-            {
-                ShowLeaderboard();
+            ShowLeaderboard();
+
+                EndGame();
             }
+
+
         }
 
-        if (PhotonNetwork.IsMasterClient)
+//        if (PhotonNetwork.IsMasterClient)
         {
             if (currentMatchTime > 0f && state == GameState.Playing)
             {
+                //Debug.Log("Check Bool " + alreadyGameEnd);
                 currentMatchTime -= Time.deltaTime;
 
                 if (currentMatchTime <= 0f)
@@ -93,7 +111,7 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
                     currentMatchTime = 0f;
 
                     state = GameState.Ending;
-                    
+
                     ListPlayersSend();
 
                     StateCheck();
@@ -102,32 +120,28 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
                 UpdateTimerDisplay();
 
                 sendTimer -= Time.deltaTime;
-                if(sendTimer <= 0)
+                if (sendTimer <= 0)
                 {
                     sendTimer += 1f;
 
                     TimerSend();
                 }
             }
-            else
-            {
-                ShowLeaderboard();
-                EndGame();
-                Debug.Log("Time Over");
-            }
+            
+
         }
     }
 
     public void OnEvent(EventData photonEvent)
     {
-        if(photonEvent.Code < 200)
+        if (photonEvent.Code < 200)
         {
             EventCodes theEvent = (EventCodes)photonEvent.Code;
             object[] data = (object[])photonEvent.CustomData;
 
             //Debug.Log("Received event " + theEvent);
 
-            switch(theEvent)
+            switch (theEvent)
             {
                 case EventCodes.NewPlayer:
 
@@ -204,7 +218,7 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
         package[0] = state;
 
-        for(int i = 0; i < allPlayers.Count; i++)
+        for (int i = 0; i < allPlayers.Count; i++)
         {
             object[] piece = new object[4];
 
@@ -230,7 +244,7 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
         state = (GameState)dataReceived[0];
 
-        for(int i = 1; i < dataReceived.Length; i++)
+        for (int i = 1; i < dataReceived.Length; i++)
         {
             object[] piece = (object[])dataReceived[i];
 
@@ -243,13 +257,14 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
             allPlayers.Add(player);
 
-            if(PhotonNetwork.LocalPlayer.ActorNumber == player.actor)
+            if (PhotonNetwork.LocalPlayer.ActorNumber == player.actor)
             {
                 index = i - 1;
             }
         }
 
         StateCheck();
+        Debug.Log("ListPlayersReceive");
     }
 
     public void UpdateStatsSend(int actorSending, int statToUpdate, int amountToChange)
@@ -266,15 +281,16 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
     public void UpdateStatsReceive(object[] dataReceived)
     {
+        Debug.Log("UpdateStatsReceive");
         int actor = (int)dataReceived[0];
         int statType = (int)dataReceived[1];
         int amount = (int)dataReceived[2];
 
-        for(int i = 0; i < allPlayers.Count; i++)
+        for (int i = 0; i < allPlayers.Count; i++)
         {
-            if(allPlayers[i].actor == actor)
+            if (allPlayers[i].actor == actor)
             {
-                switch(statType)
+                switch (statType)
                 {
                     case 0: //kills
                         allPlayers[i].kills += amount;
@@ -287,12 +303,12 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
                         break;
                 }
 
-                if(i == index)
+                if (i == index)
                 {
                     UpdateStatsDisplay();
                 }
 
-                if(UIController.instance.leaderboard.activeInHierarchy)
+                if (UIController.instance.leaderboard.activeInHierarchy)
                 {
                     ShowLeaderboard();
                 }
@@ -318,12 +334,11 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
             UIController.instance.deathsText.text = "Deaths: 0";
         }
     }
-
-    void ShowLeaderboard()
+    void ShowLeaderboard(string winnerName = "")
     {
         UIController.instance.leaderboard.SetActive(true);
 
-        foreach(LeaderboardPlayer lp in lboardPlayers)
+        foreach (LeaderboardPlayer lp in lboardPlayers)
         {
             Destroy(lp.gameObject);
         }
@@ -333,28 +348,59 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
         List<PlayerInfo> sorted = SortPlayers(allPlayers);
 
-        foreach(PlayerInfo player in sorted)
+        if (!string.IsNullOrEmpty(winnerName))
+        {
+            LeaderboardPlayer winnerDisplay = Instantiate(UIController.instance.leaderboardPlayerDisplay, UIController.instance.leaderboardPlayerDisplay.transform.parent);
+            winnerDisplay.SetDetails(winnerName, 0, 0); // No kills/deaths, just a message
+            winnerDisplay.gameObject.SetActive(true);
+            lboardPlayers.Add(winnerDisplay);
+        }
+
+        foreach (PlayerInfo player in sorted)
         {
             LeaderboardPlayer newPlayerDisplay = Instantiate(UIController.instance.leaderboardPlayerDisplay, UIController.instance.leaderboardPlayerDisplay.transform.parent);
-
             newPlayerDisplay.SetDetails(player.name, player.kills, player.deaths);
-
             newPlayerDisplay.gameObject.SetActive(true);
-
             lboardPlayers.Add(newPlayerDisplay);
         }
     }
+
+    /* void ShowLeaderboard()
+     {
+         UIController.instance.leaderboard.SetActive(true);
+
+         foreach(LeaderboardPlayer lp in lboardPlayers)
+         {
+             Destroy(lp.gameObject);
+         }
+         lboardPlayers.Clear();
+
+         UIController.instance.leaderboardPlayerDisplay.gameObject.SetActive(false);
+
+         List<PlayerInfo> sorted = SortPlayers(allPlayers);
+
+         foreach(PlayerInfo player in sorted)
+         {
+             LeaderboardPlayer newPlayerDisplay = Instantiate(UIController.instance.leaderboardPlayerDisplay, UIController.instance.leaderboardPlayerDisplay.transform.parent);
+
+             newPlayerDisplay.SetDetails(player.name, player.kills, player.deaths);
+
+             newPlayerDisplay.gameObject.SetActive(true);
+
+             lboardPlayers.Add(newPlayerDisplay);
+         }
+     }*/
 
     private List<PlayerInfo> SortPlayers(List<PlayerInfo> players)
     {
         List<PlayerInfo> sorted = new List<PlayerInfo>();
 
-        while(sorted.Count < players.Count)
+        while (sorted.Count < players.Count)
         {
             int highest = -1;
             PlayerInfo selectedPlayer = players[0];
 
-            foreach(PlayerInfo player in players)
+            foreach (PlayerInfo player in players)
             {
                 if (!sorted.Contains(player))
                 {
@@ -379,57 +425,179 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
         SceneManager.LoadScene(0);
     }
 
-    void ScoreCheck()
+    private int GetTeamKills(Team team)
     {
-        bool winnerFound = false;
+        int totalKills = 0;
 
-        foreach(PlayerInfo player in allPlayers)
+        foreach (PlayerInfo player in allPlayers)
         {
-            if(player.kills >= killsToWin && killsToWin > 0)
+            GameObject playerObj = teams[team].Find(obj => obj.GetPhotonView().Owner.ActorNumber == player.actor);
+            if (playerObj != null)
             {
-                winnerFound = true;
-                break;
+                totalKills += player.kills;
             }
         }
 
-        if(winnerFound)
+        return totalKills;
+    }
+    bool winnerFound = false;
+    string winningTeamName = "";
+    void ScoreCheck()
+    {
+        int teamAKills = GetTeamKills(Team.TeamA);
+        int teamBKills = GetTeamKills(Team.TeamB);
+
+        Debug.Log("killsToWin   " + killsToWin);
+        Debug.Log("teamAKills " + teamAKills);
+        Debug.Log("teamBKills  " + teamBKills);
+
+        if (teamAKills >= killsToWin)
         {
-            if(PhotonNetwork.IsMasterClient && state != GameState.Ending)
+            winnerFound = true;
+            winningTeamName = "Team A Wins!";
+        }
+        else if (teamBKills >= killsToWin)
+        {
+            winnerFound = true;
+            winningTeamName = "Team B Wins!";
+        }
+        else if (currentMatchTime <= 0f)
+        {
+            winnerFound = true; // Mark round as over
+            if (teamAKills > teamBKills)
+                winningTeamName = "Team A Wins!";
+            else if (teamBKills > teamAKills)
+                winningTeamName = "Team B Wins!";
+            else
+                winningTeamName = "Round Over!";
+        }
+
+        if (winnerFound)
+        {
+            if (/*PhotonNetwork.IsMasterClient &&*/ state != GameState.Ending)
             {
                 state = GameState.Ending;
                 ListPlayersSend();
             }
+
+            UIController.instance.endText.text = winningTeamName;
+             photonView.RPC("RPC_ShowWinningTeam", RpcTarget.All, winningTeamName);
+            Debug.Log("ScoreCheck---" + UIController.instance.endText.text);
         }
     }
+  
+
+    /* void ScoreCheck()
+     {
+         bool winnerFound = false;
+
+         foreach(PlayerInfo player in allPlayers)
+         {
+             if(player.kills >= killsToWin && killsToWin > 0)
+             {
+                 winnerFound = true;
+                 break;
+             }
+         }
+
+         if(winnerFound)
+         {
+             if(PhotonNetwork.IsMasterClient && state != GameState.Ending)
+             {
+                 state = GameState.Ending;
+                 ListPlayersSend();
+             }
+         }
+     }*/
 
     void StateCheck()
     {
-        if(state == GameState.Ending)
+        if (state == GameState.Ending)
         {
-            EndGame();
+            Debug.Log("StateCheck");
+           
+                EndGame();
+            Debug.Log("Check Bool " + alreadyGameEnd);
+            
         }
     }
 
     void EndGame()
     {
-        state = GameState.Ending;
-
-        if(PhotonNetwork.IsMasterClient)
+        if (!alreadyGameEnd)
         {
-            PhotonNetwork.DestroyAll();
+            alreadyGameEnd = true;
+            state = GameState.Ending;
+
+            if (PhotonNetwork.IsMasterClient)
+            {
+                PhotonNetwork.DestroyAll();
+            }
+
+            UIController.instance.endScreen.SetActive(true);
+            ShowLeaderboard();
+            // SetWinningTeamText();
+            ScoreCheck();
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            Camera.main.transform.position = mapCamPoint.position;
+            Camera.main.transform.rotation = mapCamPoint.rotation;
+
+            StartCoroutine(EndCo());
         }
 
-        UIController.instance.endScreen.SetActive(true);
-        ShowLeaderboard();
 
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
-
-        Camera.main.transform.position = mapCamPoint.position;
-        Camera.main.transform.rotation = mapCamPoint.rotation;
-
-        StartCoroutine(EndCo());
     }
+    IEnumerator ExitGame()
+    {
+        yield return new WaitForSeconds(20f);
+
+        PhotonNetwork.LeaveRoom();
+        UIController.instance.ReturnToMainMenu();
+    }
+    void SetWinningTeamText()
+    {
+        int teamAKills = 0;
+        int teamBKills = 0;
+
+        foreach (PlayerInfo player in allPlayers)
+        {
+            // Safely check for Team A
+            if (MatchManager.teams[Team.TeamA].Exists(go =>
+                go != null &&
+                go.GetComponent<PlayerController>() != null &&
+                go.GetComponent<PlayerController>().photonView.Owner.ActorNumber == player.actor))
+            {
+                teamAKills += player.kills;
+            }
+            // Safely check for Team B
+            else if (MatchManager.teams[Team.TeamB].Exists(go =>
+                go != null &&
+                go.GetComponent<PlayerController>() != null &&
+                go.GetComponent<PlayerController>().photonView.Owner.ActorNumber == player.actor))
+            {
+                teamBKills += player.kills;
+            }
+        }
+
+        Debug.Log($"Team A kills {teamAKills}  Team B Kills {teamBKills}");
+
+        string winningText = "";
+        if (teamAKills > teamBKills)
+            winningText = "Team A Wins!";
+        else if (teamBKills > teamAKills)
+            winningText = "Team B Wins!";
+        else
+            winningText = "Round Over!";
+
+
+        UIController.instance.endText.text = winningText;
+        alreadyGameEnd = true;
+
+
+    }
+
 
     private IEnumerator EndCo()
     {
@@ -439,10 +607,12 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
         {
             PhotonNetwork.AutomaticallySyncScene = false;
             PhotonNetwork.LeaveRoom();
-        } else
+        }
+        else
         {
 
             Debug.Log("EndCO else loop");
+           
             /*if(PhotonNetwork.IsMasterClient)
             {
                 if (!Launcher.instance.changeMapBetweenRounds)
@@ -496,7 +666,7 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
     public void SetupTimer()
     {
-        if(matchLength > 0)
+        if (matchLength > 0)
         {
             currentMatchTime = matchLength;
             UpdateTimerDisplay();
@@ -505,7 +675,7 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
 
     public void UpdateTimerDisplay()
     {
-        
+
         var timeToDisplay = System.TimeSpan.FromSeconds(currentMatchTime);
 
         UIController.instance.timerText.text = timeToDisplay.Minutes.ToString("00") + ":" + timeToDisplay.Seconds.ToString("00");

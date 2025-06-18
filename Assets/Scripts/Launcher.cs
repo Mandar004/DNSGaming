@@ -92,7 +92,7 @@ public class Launcher : MonoBehaviourPunCallbacks
         CloseMenus();
         menuButtons.SetActive(true);
 
-        PhotonNetwork.NickName = Random.Range(0, 1000).ToString();
+//        PhotonNetwork.NickName = Random.Range(0, 1000).ToString();
 
         if (!hasSetNick)
         {
@@ -121,7 +121,7 @@ public class Launcher : MonoBehaviourPunCallbacks
         if(!string.IsNullOrEmpty(roomNameInput.text))
         {
             RoomOptions options = new RoomOptions();
-            options.MaxPlayers = 2;
+            options.MaxPlayers = 4;
 
             PhotonNetwork.CreateRoom(roomNameInput.text, options);
 
@@ -270,9 +270,9 @@ public class Launcher : MonoBehaviourPunCallbacks
 
     public void StartGame()
     {
-        //PhotonNetwork.LoadLevel(levelToPlay);
+        PhotonNetwork.LoadLevel(levelToPlay);
 
-        PhotonNetwork.LoadLevel(allMaps[Random.Range(0, allMaps.Length)]);
+        //PhotonNetwork.LoadLevel(allMaps[1]);
     }
 
     public override void OnMasterClientSwitched(Player newMasterClient)
@@ -290,7 +290,7 @@ public class Launcher : MonoBehaviourPunCallbacks
     public void QuickJoin()
     {
         RoomOptions options = new RoomOptions();
-        options.MaxPlayers = 8;
+        options.MaxPlayers = 4;
 
         PhotonNetwork.CreateRoom("Test", options);
         CloseMenus();

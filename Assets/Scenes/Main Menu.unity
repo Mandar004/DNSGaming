@@ -479,7 +479,7 @@ MonoBehaviour:
   theRoomButton: {fileID: 1625103481}
   nameInputScreen: {fileID: 600291484}
   nameInput: {fileID: 380965399}
-  levelToPlay: Map 1
+  levelToPlay: Map 2
   startButton: {fileID: 1262024651}
   roomTestButton: {fileID: 2122533835}
   allMaps:

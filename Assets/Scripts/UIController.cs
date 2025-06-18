@@ -21,6 +21,8 @@ public class UIController : MonoBehaviour
     public Button adsButton;
 
     public TMP_Text overheatedMessage;
+    public TMP_Text endText; 
+
     public Slider weaponTempSlider;
 
     public GameObject deathScreen;
@@ -70,7 +72,7 @@ public class UIController : MonoBehaviour
             optionsScreen.SetActive(false);
         }
     }
-
+   
     public void ReturnToMainMenu()
     {
         PhotonNetwork.AutomaticallySyncScene = false;
