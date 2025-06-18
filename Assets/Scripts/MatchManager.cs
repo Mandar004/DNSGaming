@@ -481,11 +481,24 @@ public class MatchManager : MonoBehaviourPunCallbacks, IOnEventCallback
             }
 
             UIController.instance.endText.text = winningTeamName;
-             photonView.RPC("RPC_ShowWinningTeam", RpcTarget.All, winningTeamName);
+
+            ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable();
+            props["Winner"] = winningTeamName;
+            PhotonNetwork.CurrentRoom.SetCustomProperties(props);
+
             Debug.Log("ScoreCheck---" + UIController.instance.endText.text);
         }
     }
-  
+    public override void OnRoomPropertiesUpdate(ExitGames.Client.Photon.Hashtable propertiesThatChanged)
+    {
+        if (propertiesThatChanged.ContainsKey("Winner"))
+        {
+            string winner = propertiesThatChanged["Winner"].ToString();
+            UIController.instance.endText.text = winner;
+            Debug.Log("Winner received: " + winner);
+        }
+    }
+
 
     /* void ScoreCheck()
      {
